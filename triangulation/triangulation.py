@@ -1,47 +1,44 @@
 from scipy.optimize import fsolve
+import numpy as np
 import sys
-from math import exp, sqrt
-
+from math import cos, sin, asin, atan2
 
 # data that I got to work:: should output (2, 2) -> python3 triangulation.py 2.828 2.236 2.236 0 1 0 0 0 1 .5 .25 .5 .75
 C = 343
-#TODO: add C to equations
-def equations(x0, pos1, pos2, t1, t2, t3):
-    t_ab = t2 - t1
-    t_ac = t3 - t1
+EARTH_RADIUS = 6371000
 
-    xb, yb = pos1
-    xc, yc = pos2
+def get_sound_loc(pos1, pos2, t_origin, t1, t2):
+    x1, y1 = pos1
+    x2, y2 = pos2
 
-    x, y = x0
-    eq1 = sqrt( (x-xb)**2 + (y - yb)**2 ) - sqrt(x**2 + y**2) - t_ab
-    eq2 = sqrt( (x-xc)**2 + (y - yc)**2 ) - sqrt(x**2 + y**2) - t_ac
-    return [eq1, eq2]
+    # set up the matrix multiplication
+    lhs = np.array([[-2 * x1, -2 * y1], [-2 * x2, -2 * y2]], dtype=np.float64)
 
-def convert_to_xy(lat1, long1):
-    #TODO: conversion
-    return lat1, long1
+    ans1 = -x1**2 - y1**2 + t1**2 - t_origin**2
+    ans2 = -x2**2 - y2**2 + t2**2 - t_origin**2
 
-def get_best_guess(pos1, vec1, pos2, vec2):
-    line1 = [pos1, (vec1[0] + pos1[0], vec1[1] + pos1[1])]
-    line2 = [pos2, (vec2[0] + pos2[0], vec2[1] + pos2[1])]
+    rhs = np.array([[ans1], [ans2]], dtype=np.float64)
 
-    xdiff = (line1[0][0] - line1[1][0], line2[0][0] - line2[1][0])
-    ydiff = (line1[0][1] - line1[1][1], line2[0][1] - line2[1][1])
+    # do matrix multiplication to compute the answer
+    res = np.dot(np.linalg.inv(lhs), rhs)
 
-    def det(a, b):
-        return a[0] * b[1] - a[1] * b[0]
+    # return x, y
+    return res[0][0], res[1][0]
 
-    div = det(xdiff, ydiff)
-    if div == 0:
-       print("Lines do not intersect", file=sys.stderr)
-       exit(1)
+def convert_to_xy(lat, long):
+    # x and y coordinates
+    x = EARTH_RADIUS * cos(lat) * cos(long)
+    y = EARTH_RADIUS * cos(lat) * sin(long)
 
-    d = (det(*line1), det(*line2))
-    x = det(d, xdiff) / div
-    y = det(d, ydiff) / div
+    # return the tuple
     return x, y
 
+def convert_to_lat_long(x, y, device_lat):
+        z  = EARTH_RADIUS * sin(device_lat)
+        lat = asin(z / EARTH_RADIUS)
+        long = atan2(y, x)
+
+        return lat, long
 
 def main():
     if len(sys.argv) != 14:
@@ -74,16 +71,14 @@ def main():
     pos2 = (pos2[0] - offset[0], pos2[1] - offset[1])
     pos3 = (pos3[0] - offset[0], pos3[1] - offset[1])
 
-    # get best guess for point
-    vec1 = [vec1x, vec1y]
-    vec2 = [vec2x, vec2y]
-    best_guess = get_best_guess(pos1, vec1, pos2, vec2)
+    # solve triangulation to get position of object
+    x, y = get_sound_loc(pos2, pos3, t1, t2, t3)
 
-    # solve numerically using best guess
-    x, y =  fsolve(equations, best_guess, (pos2, pos3, t1, t2, t3))
     x += offset[0]
     y += offset[1]
-    print(x, y)
+
+    lat, long = convert_to_lat_long(x, y, lat1)
+    print(lat, long)
 
 
 if __name__ == '__main__':

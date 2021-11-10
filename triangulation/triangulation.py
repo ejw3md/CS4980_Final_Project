@@ -79,7 +79,12 @@ def main():
     x, y, t = fsolve(equations, best_guess, (pos1, pos2, pos3))
     x += offset[0]
     y += offset[1]
-    print(x, y)
+
+    # convert back from x, y coordinates to lat, long
+    lat, long = convert_to_lat_long(x, y, lats[0])
+
+    # print the answer
+    print(lat, long)
 
 
 if __name__ == '__main__':

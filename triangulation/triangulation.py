@@ -1,29 +1,27 @@
 from scipy.optimize import fsolve
-import numpy as np
 import sys
-from math import cos, sin, asin, atan2
+from math import exp, sqrt, cos, sin, asin, atan2
 
-# data that I got to work:: should output (2, 2) -> python3 triangulation.py 2.828 2.236 2.236 0 1 0 0 0 1 .5 .25 .5 .75
+
+# TODO: test longitude and lattitude conversions
 C = 343
 EARTH_RADIUS = 6371000
 
-def get_sound_loc(pos1, pos2, t_origin, t1, t2):
-    x1, y1 = pos1
-    x2, y2 = pos2
+def equations(x0, pos1, pos2, pos3):
+    # grab all input parameters
+    x1, y1, t1 = pos1
+    x2, y2, t2 = pos2
+    x3, y3, t3 = pos3
 
-    # set up the matrix multiplication
-    lhs = np.array([[-2 * x1, -2 * y1], [-2 * x2, -2 * y2]], dtype=np.float64)
+    # get values from vector
+    x, y, t = x0
 
-    ans1 = -x1**2 - y1**2 + t1**2 - t_origin**2
-    ans2 = -x2**2 - y2**2 + t2**2 - t_origin**2
+    # set up equations we are solving
+    eq1 = sqrt( (x-x1)**2 + (y - y1)**2 ) - C * ( t1 - t )
+    eq2 = sqrt( (x-x2)**2 + (y - y2)**2 ) - C * ( t2 - t )
+    eq3 = sqrt( (x-x3)**2 + (y - y3)**2 ) - C * ( t3 - t )
 
-    rhs = np.array([[ans1], [ans2]], dtype=np.float64)
-
-    # do matrix multiplication to compute the answer
-    res = np.dot(np.linalg.inv(lhs), rhs)
-
-    # return x, y
-    return res[0][0], res[1][0]
+    return [eq1, eq2, eq3]
 
 def convert_to_xy(lat, long):
     # x and y coordinates
@@ -34,51 +32,54 @@ def convert_to_xy(lat, long):
     return x, y
 
 def convert_to_lat_long(x, y, device_lat):
-        z  = EARTH_RADIUS * sin(device_lat)
-        lat = asin(z / EARTH_RADIUS)
-        long = atan2(y, x)
+    z  = EARTH_RADIUS * sin(device_lat)
+    lat = asin(z / EARTH_RADIUS)
+    long = atan2(y, x)
 
-        return lat, long
+    return lat, long
+
+def get_best_guess(pos1, pos2, pos3):
+    # our best guess is mic with smallest time
+    t1 = pos1[2]
+    t2 = pos2[2]
+    t3 = pos3[2]
+
+    if t1 < t2 and t1 < t3:
+        return (pos1[0], pos1[1], 0)
+    elif t2 < t1 and t2 < t3:
+        return (pos2[0], pos2[1], 0)
+    else:
+        return (pos3[0], pos3[1], 0)
 
 def main():
-    if len(sys.argv) != 14:
+    if len(sys.argv) != 10:
         print('Invalid number of arguments!', file=sys.stderr)
         exit(1)
 
     # get input variables
-    t1 = float(sys.argv[1])
-    t2 = float(sys.argv[2])
-    t3 = float(sys.argv[3])
-    lat1 = float(sys.argv[4])
-    lat2 = float(sys.argv[5])
-    lat3 = float(sys.argv[6])
-    long1 = float(sys.argv[7])
-    long2 = float(sys.argv[8])
-    long3 = float(sys.argv[9])
-    vec1x = float(sys.argv[10])
-    vec2x = float(sys.argv[11])
-    vec1y = float(sys.argv[12])
-    vec2y = float(sys.argv[13])
+    times = [float(x) for x in sys.argv[1:4]]
+    lats = [float(x) for x in sys.argv[4:7]]
+    longs = [float(x) for x in sys.argv[7:10]]
 
     # convert from lat long to xy
-    pos1 = convert_to_xy(lat1, long1)
-    pos2 = convert_to_xy(lat2, long2)
-    pos3 = convert_to_xy(lat3, long3)
-    
+    pos1 = convert_to_xy(lats[0], longs[0])
+    pos2 = convert_to_xy(lats[1], longs[1])
+    pos3 = convert_to_xy(lats[2], longs[2])
+
     # make pos1 at (0, 0)
     offset = pos1
-    pos1 = (pos1[0] - offset[0], pos1[1] - offset[1])
-    pos2 = (pos2[0] - offset[0], pos2[1] - offset[1])
-    pos3 = (pos3[0] - offset[0], pos3[1] - offset[1])
+    pos1 = (pos1[0] - offset[0], pos1[1] - offset[1], times[0])
+    pos2 = (pos2[0] - offset[0], pos2[1] - offset[1], times[1])
+    pos3 = (pos3[0] - offset[0], pos3[1] - offset[1], times[2])
 
-    # solve triangulation to get position of object
-    x, y = get_sound_loc(pos2, pos3, t1, t2, t3)
+    # get best guess for point
+    best_guess = get_best_guess(pos1, pos2, pos3)
 
+    # solve numerically using best guess (Newton-Raphson method)
+    x, y, t = fsolve(equations, best_guess, (pos1, pos2, pos3))
     x += offset[0]
     y += offset[1]
-
-    lat, long = convert_to_lat_long(x, y, lat1)
-    print(lat, long)
+    print(x, y)
 
 
 if __name__ == '__main__':

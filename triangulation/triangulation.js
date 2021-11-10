@@ -11,12 +11,8 @@ var lat3 = 0
 var long1 = 0
 var long2 = 0
 var long3 = 1
-var vec1x = 0.5
-var vec2x = 0.25
-var vec1y = 0.5
-var vec2y = 0.75
 
-command += ` ${t1} ${t2} ${t3} ${lat1} ${lat2} ${lat3} ${long1} ${long2} ${long3} ${vec1x} ${vec2x} ${vec1y} ${vec2y}`;
+command += ` ${t1} ${t2} ${t3} ${lat1} ${lat2} ${lat3} ${long1} ${long2} ${long3}`;
 
 // execute python
 // get output data response

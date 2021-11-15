@@ -1,8 +1,39 @@
+############################################################
+#   TRIANGULATION SCRIPT
+#
+#   The purpose of this module is to compute the lat long
+#   coordinates of the sound given 3 positions of 
+#   the microphones that heard the sound, and the times
+#   the microphones heard the sound.
+#
+#   Input:
+#       3 microphone lattitude longitude coordinates
+#       3 times
+#
+#   Output:
+#       lat and long of triangulated sound
+#
+#
+############################################################
+
 from scipy.optimize import fsolve
 import sys
 from math import sqrt, cos, radians, degrees
 
-# TODO: test longitude and lattitude conversions
+'''
+############################################################
+TEST COMMAND - data obtained with google maps
+
+
+python3 triangulation.py \
+0.03796226239 0.02611682798 0.02172699708 \
+38.97623917161576 38.97628921549201 38.97614586018865 \
+-92.25761003060849 -92.25743300461887 -92.25744574549879
+
+Should output something close to: 
+    38.97621310689329, -92.25746183858462
+############################################################
+'''
 C = 343
 EARTH_RADIUS = 6371000
 
@@ -62,22 +93,13 @@ def get_best_guess(pos1, pos2, pos3):
     else:
         return (pos3[0], pos3[1], 0)
 
-def main():
-    if len(sys.argv) != 10:
-        print('Invalid number of arguments!', file=sys.stderr)
-        exit(1)
-
-    # get input variables
-    times = [float(x) for x in sys.argv[1:4]]
-    lats = [float(x) for x in sys.argv[4:7]]
-    longs = [float(x) for x in sys.argv[7:10]]
-
-    center_lat = sum(lats) / 3
+def get_sound_coordinates(mic1, mic2, mic3):
+    center_lat = (mic1['lat'] + mic2['lat'] + mic3['lat']) / 3
 
     # convert from lat long to xy
-    pos1 = convert_to_xy(lats[0], longs[0], center_lat)
-    pos2 = convert_to_xy(lats[1], longs[1], center_lat)
-    pos3 = convert_to_xy(lats[2], longs[2], center_lat)
+    pos1 = convert_to_xy(mic1['lat'], mic1['long'], center_lat) + (mic1['time'],)
+    pos2 = convert_to_xy(mic2['lat'], mic2['long'], center_lat) + (mic2['time'],)
+    pos3 = convert_to_xy(mic3['lat'], mic3['long'], center_lat) + (mic3['time'],)
 
     # get best guess for point
     best_guess = get_best_guess(pos1, pos2, pos3)
@@ -93,4 +115,18 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # this is for running tests of triangulation.py module
+
+    if len(sys.argv) != 10:
+        print('Invalid number of arguments!', file=sys.stderr)
+        exit(1)
+
+    # get input variables
+    times = [float(x) for x in sys.argv[1:4]]
+    lats = [float(x) for x in sys.argv[4:7]]
+    longs = [float(x) for x in sys.argv[7:10]]
+
+    mics = []
+    for time, lat, long in zip(times, lats, longs):
+        mics.append({'time': time, 'lat': lat, 'long': long})
+    get_sound_coordinates(mics[0], mics[1], mics[2])

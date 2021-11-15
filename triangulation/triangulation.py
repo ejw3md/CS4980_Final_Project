@@ -1,7 +1,6 @@
 from scipy.optimize import fsolve
 import sys
-from math import exp, sqrt, cos, sin, asin, atan2
-
+from math import sqrt, cos, radians, degrees
 
 # TODO: test longitude and lattitude conversions
 C = 343
@@ -23,18 +22,30 @@ def equations(x0, pos1, pos2, pos3):
 
     return [eq1, eq2, eq3]
 
-def convert_to_xy(lat, long):
-    # x and y coordinates
-    x = EARTH_RADIUS * cos(lat) * cos(long)
-    y = EARTH_RADIUS * cos(lat) * sin(long)
+def convert_to_xy(lat, long, center_lat):
+    # convert lat long to radians to make computations easier
+    lat = radians(lat)
+    long = radians(long)
+    center_lat = radians(center_lat)
+
+    # compute a equirectangular projection to get x and y
+    x = EARTH_RADIUS * long * cos(center_lat)
+    y = EARTH_RADIUS * lat
 
     # return the tuple
     return x, y
 
-def convert_to_lat_long(x, y, device_lat):
-    z  = EARTH_RADIUS * sin(device_lat)
-    lat = asin(z / EARTH_RADIUS)
-    long = atan2(y, x)
+def convert_to_lat_long(x, y, center_lat):
+    # make sure center is in radians
+    center_lat = radians(center_lat)
+
+    # do a reverse equirectangular projection
+    long = x / (EARTH_RADIUS * cos(center_lat))
+    lat = y / EARTH_RADIUS
+
+    # convert from radians to degrees
+    long = degrees(long)
+    lat = degrees(lat)
 
     return lat, long
 
@@ -61,27 +72,21 @@ def main():
     lats = [float(x) for x in sys.argv[4:7]]
     longs = [float(x) for x in sys.argv[7:10]]
 
-    # convert from lat long to xy
-    pos1 = convert_to_xy(lats[0], longs[0])
-    pos2 = convert_to_xy(lats[1], longs[1])
-    pos3 = convert_to_xy(lats[2], longs[2])
+    center_lat = sum(lats) / 3
 
-    # make pos1 at (0, 0)
-    offset = pos1
-    pos1 = (pos1[0] - offset[0], pos1[1] - offset[1], times[0])
-    pos2 = (pos2[0] - offset[0], pos2[1] - offset[1], times[1])
-    pos3 = (pos3[0] - offset[0], pos3[1] - offset[1], times[2])
+    # convert from lat long to xy
+    pos1 = convert_to_xy(lats[0], longs[0], center_lat)
+    pos2 = convert_to_xy(lats[1], longs[1], center_lat)
+    pos3 = convert_to_xy(lats[2], longs[2], center_lat)
 
     # get best guess for point
     best_guess = get_best_guess(pos1, pos2, pos3)
 
     # solve numerically using best guess (Newton-Raphson method)
     x, y, t = fsolve(equations, best_guess, (pos1, pos2, pos3))
-    x += offset[0]
-    y += offset[1]
 
     # convert back from x, y coordinates to lat, long
-    lat, long = convert_to_lat_long(x, y, lats[0])
+    lat, long = convert_to_lat_long(x, y, center_lat)
 
     # print the answer
     print(lat, long)

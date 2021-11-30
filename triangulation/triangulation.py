@@ -5,7 +5,7 @@
 #   coordinates of the sound given 3 positions of 
 #   the microphones that heard the sound, and the times
 #   the microphones heard the sound.
-#
+#   
 #   Input:
 #       3 microphone lattitude longitude coordinates
 #       3 times
@@ -13,6 +13,9 @@
 #   Output:
 #       lat and long of triangulated sound
 #
+#   Can be tested locally and also ran as a google cloud 
+#   function at 
+#   https://us-central1-capstone-sound-triangulation.cloudfunctions.net/triangulation
 #
 ############################################################
 
@@ -21,21 +24,6 @@ import sys
 from math import sqrt, cos, radians, degrees
 import json
 
-
-'''
-############################################################
-TEST COMMAND - data obtained with google maps
-
-
-python3 triangulation.py \
-0.03796226239 0.02611682798 0.02172699708 \
-38.97623917161576 38.97628921549201 38.97614586018865 \
--92.25761003060849 -92.25743300461887 -92.25744574549879
-
-Should output something close to: 
-    38.97621310689329, -92.25746183858462
-############################################################
-'''
 C = 343
 EARTH_RADIUS = 6371000
 

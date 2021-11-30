@@ -19,6 +19,8 @@
 from scipy.optimize import fsolve
 import sys
 from math import sqrt, cos, radians, degrees
+import json
+
 
 '''
 ############################################################
@@ -87,11 +89,14 @@ def get_best_guess(pos1, pos2, pos3):
     t3 = pos3[2]
 
     if t1 < t2 and t1 < t3:
-        return (pos1[0], pos1[1], 0)
+        print("choosing pos1")
+        return pos1
     elif t2 < t1 and t2 < t3:
-        return (pos2[0], pos2[1], 0)
+        print("choosing pos2")
+        return pos2
     else:
-        return (pos3[0], pos3[1], 0)
+        print("choosing pos3")
+        return pos3
 
 def get_sound_coordinates(mic1, mic2, mic3):
     center_lat = (mic1['lat'] + mic2['lat'] + mic3['lat']) / 3
@@ -105,28 +110,99 @@ def get_sound_coordinates(mic1, mic2, mic3):
     best_guess = get_best_guess(pos1, pos2, pos3)
 
     # solve numerically using best guess (Newton-Raphson method)
-    x, y, t = fsolve(equations, best_guess, (pos1, pos2, pos3))
+    x0, infodict, _, msg = fsolve(equations, best_guess, (pos1, pos2, pos3), full_output=True, xtol=5e-14)
+    x, y, t = x0
+    print(f"This should be close to 0: {equations((x, y, t), pos1, pos2, pos3)}")
 
+    print(f"iterations to converge: {infodict['nfev']}")
+    print(msg)
     # convert back from x, y coordinates to lat, long
     lat, long = convert_to_lat_long(x, y, center_lat)
 
-    # print the answer
-    print(lat, long)
+    # check to see if answer is too far away
+    # if it is return best guess
+    if abs(center_lat - lat) > 1:
+        print("Error resulting algorithm answer too far away from input\nReturning closest microphone")
+        return convert_to_lat_long(best_guess[0], best_guess[1], center_lat)
 
+    # return the answer
+    return lat, long
 
-if __name__ == '__main__':
-    # this is for running tests of triangulation.py module
+def triangulation(request):
+    """Responds to any HTTP request.
+    Args:
+        request (flask.Request): HTTP request object.
+    Returns:
+        The response text or any set of values that can be turned into a
+        Response object using
+        `make_response <http://flask.pocoo.org/docs/1.0/api/#flask.Flask.make_response>`.
+    """
+    try:
+        req = request.get_json()
+        data = req['data']
+        print(data)
+    except Exception as e:
+        print("unable to parse json\n", request)
+        return "unable to parse json"
 
-    if len(sys.argv) != 10:
-        print('Invalid number of arguments!', file=sys.stderr)
-        exit(1)
+    try:
+        times = data['times']
+        lats = data['lats']
+        longs = data['longs']
+    except Exception as e:
+        print("json not formatted correctly\n", request)
+        return "json not formatted correctly"
+    
+    mics = []
+    for time, lat, long in zip(times, lats, longs):
+        mics.append({'time': time, 'lat': lat, 'long': long})
 
-    # get input variables
-    times = [float(x) for x in sys.argv[1:4]]
-    lats = [float(x) for x in sys.argv[4:7]]
-    longs = [float(x) for x in sys.argv[7:10]]
+    lattitude, longitude = get_sound_coordinates(mics[0], mics[1], mics[2])
+
+    print("Lat: " + str(lattitude) + "\nLong: " + str(longitude))
+    ret = json.dumps({'data': {'lat': lattitude, 'long': longitude}})
+
+    print("Returning lattitude and longitude")
+    return ret
+
+############################################################
+#   EVERYTHING BEFORE THIS POINT IS EXACTLY THE CLOUD
+#   FUNCTION
+#
+#    AFTER THIS POINT IS USED FOR LOCAL TESTING
+############################################################
+
+'''
+############################################################
+TO TEST RUN THE FOLLOWING:
+
+python3 triangulation.py '{
+"data": {
+    "times": [0.03796226239, 0.02611682798, 0.02172699708 ],
+    "lats": [38.97623917161576, 38.97628921549201, 38.97614586018865 ],
+    "longs": [-92.25761003060849, -92.25743300461887, -92.25744574549879]
+    }
+}'
+
+Should output something close to: 
+38.97621310689329, -92.25746183858462
+
+############################################################
+'''
+
+def main():
+    data = json.loads(sys.argv[1])['data']
+    times = data['times']
+    lats = data['lats']
+    longs = data['longs']
 
     mics = []
     for time, lat, long in zip(times, lats, longs):
         mics.append({'time': time, 'lat': lat, 'long': long})
-    get_sound_coordinates(mics[0], mics[1], mics[2])
+
+    lattitude, longitude = get_sound_coordinates(mics[0], mics[1], mics[2])
+
+    print("lattitude:", lattitude, "longitude", longitude)
+
+if __name__ == "__main__":
+    main()

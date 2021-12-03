@@ -44,6 +44,9 @@ def equations(x0, pos1, pos2, pos3):
     return [eq1, eq2, eq3]
 
 def convert_to_xy(lat, long, center_lat):
+    # make sure lat and long are valid
+    if abs(lat) > 90 or abs(long) > 180:
+        raise RuntimeError
     # convert lat long to radians to make computations easier
     lat = radians(lat)
     long = radians(long)
@@ -67,7 +70,8 @@ def convert_to_lat_long(x, y, center_lat):
     # convert from radians to degrees
     long = degrees(long)
     lat = degrees(lat)
-
+    if abs(lat) > 90 or abs(long) > 180:
+        raise RuntimeError 
     return lat, long
 
 def get_best_guess(pos1, pos2, pos3):
@@ -75,6 +79,9 @@ def get_best_guess(pos1, pos2, pos3):
     t1 = pos1[2]
     t2 = pos2[2]
     t3 = pos3[2]
+
+    if t1 < 0 or t2 < 0 or t3 <  0:
+        raise RuntimeError
 
     if t1 < t2 and t1 < t3:
         print("choosing pos1")
@@ -90,12 +97,16 @@ def get_sound_coordinates(mic1, mic2, mic3):
     center_lat = (mic1['lat'] + mic2['lat'] + mic3['lat']) / 3
 
     # convert from lat long to xy
-    pos1 = convert_to_xy(mic1['lat'], mic1['long'], center_lat) + (mic1['time'],)
-    pos2 = convert_to_xy(mic2['lat'], mic2['long'], center_lat) + (mic2['time'],)
-    pos3 = convert_to_xy(mic3['lat'], mic3['long'], center_lat) + (mic3['time'],)
+    try:
+        pos1 = convert_to_xy(mic1['lat'], mic1['long'], center_lat) + (mic1['time'],)
+        pos2 = convert_to_xy(mic2['lat'], mic2['long'], center_lat) + (mic2['time'],)
+        pos3 = convert_to_xy(mic3['lat'], mic3['long'], center_lat) + (mic3['time'],)
 
-    # get best guess for point
-    best_guess = get_best_guess(pos1, pos2, pos3)
+        # get best guess for point
+        best_guess = get_best_guess(pos1, pos2, pos3)
+    except RuntimeError:
+        print("Invalid data recieved, returning first mic")
+        return mic1['lat'], mic2['lat']
 
     # solve numerically using best guess (Newton-Raphson method)
     x0, infodict, _, msg = fsolve(equations, best_guess, (pos1, pos2, pos3), full_output=True, xtol=5e-14)
@@ -104,8 +115,13 @@ def get_sound_coordinates(mic1, mic2, mic3):
 
     print(f"iterations to converge: {infodict['nfev']}")
     print(msg)
-    # convert back from x, y coordinates to lat, long
-    lat, long = convert_to_lat_long(x, y, center_lat)
+
+    try:
+        # convert back from x, y coordinates to lat, long
+        lat, long = convert_to_lat_long(x, y, center_lat)
+    except RuntimeError:
+        print("Algorithm did not convertge to valid answer, returning closest microphone")
+        return convert_to_lat_long(best_guess[0], best_guess[1], center_lat)
 
     # check to see if answer is too far away
     # if it is return best guess
@@ -162,7 +178,7 @@ def triangulation(request):
 
 '''
 ############################################################
-TO TEST RUN THE FOLLOWING:
+TO TEST SANITY RUN THE FOLLOWING:
 
 python3 triangulation.py '{
 "data": {
@@ -190,7 +206,7 @@ def main():
 
     lattitude, longitude = get_sound_coordinates(mics[0], mics[1], mics[2])
 
-    print("lattitude:", lattitude, "longitude", longitude)
+    print("lattitude:", lattitude, "longitude:", longitude)
 
 if __name__ == "__main__":
     main()

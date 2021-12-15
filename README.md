@@ -1,5 +1,5 @@
 # CS4980_Final_Project
-Final project for CS4980. This repository contains all code pertaining to the triangulation algorithm. To see the iOS repository click the first link below.
+Final project for CS4980. This repository contains all code pertaining to the triangulation algorithm and some labels for the model. To see the iOS app repository click the first link below.
 
 ### Links
 1. [iOS Github](https://github.com/michaelboeding/Capstone_Sound_Triangulation_App)
